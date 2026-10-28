@@ -1,0 +1,24 @@
+name: Build Windows
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - name: Validate
+        run: dotnet run --project tests/PortBridge.Tests -c Release
+      - name: Package
+        shell: pwsh
+        run: ./build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PortBridge-win-x64
+          path: dist/PortBridge-win-x64.zip

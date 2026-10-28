@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+dist/
+.vs/
+*.user
+*.suo
+settings.json
+*.key
+*.pem
+test-results/

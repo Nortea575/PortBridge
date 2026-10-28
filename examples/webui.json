@@ -1,0 +1,12 @@
+{
+  "Name": "我的测试服务器",
+  "Host": "server.example.com",
+  "Port": 22,
+  "User": "your-user",
+  "Auth": "password",
+  "KeyPath": "",
+  "Rules": [
+    { "Enabled": true, "Name": "WebUI", "LocalPort": 18080, "TargetHost": "127.0.0.1", "TargetPort": 8080, "Protocol": "http", "Path": "/" },
+    { "Enabled": true, "Name": "VNC", "LocalPort": 15900, "TargetHost": "127.0.0.1", "TargetPort": 5900, "Protocol": "tcp", "Path": "/" }
+  ]
+}
