@@ -21,11 +21,25 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+      - name: Install Inno Setup 7.1.1
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-7.1.1-x64.exe'
+          curl.exe --fail --location --http1.1 --retry 5 --retry-all-errors --retry-delay 1 --retry-max-time 300 --output $installer 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_1/innosetup-7.1.1-x64.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup download failed.' }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Pyrsys B.V.*') { throw 'Inno Setup Authenticode signature is invalid.' }
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+          if ($hash -ne '8A5A6711C3766A6E5FB74F280BA0E3551E719CE94538D901FDBD1F8F9920B3F0') { throw 'Inno Setup SHA-256 does not match the pinned release asset.' }
+          $installDir = Join-Path $env:RUNNER_TEMP 'Inno Setup 7.1.1'
+          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/NOICONS','/PORTABLE=1',('/DIR="' + $installDir + '"')) -WindowStyle Hidden -Wait -PassThru
+          if ($install.ExitCode -ne 0 -or !(Test-Path -LiteralPath (Join-Path $installDir 'ISCC.exe'))) { throw 'Inno Setup compiler installation failed.' }
+          "ISCC_PATH=$(Join-Path $installDir 'ISCC.exe')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Validate
         run: dotnet run --project tests/PortBridge.Tests -c Release
       - name: Build Windows package
         shell: pwsh
-        run: ./build.ps1
+        run: ./build.ps1 -IsccPath $env:ISCC_PATH
       - name: Publish GitHub Release
         shell: pwsh
         env:
@@ -37,16 +51,21 @@ jobs:
             throw 'Release version must match the application version.'
           }
           $tag = "v$version"
-          $notes = @'
-          Windows 图形化 SSH 服务转发器。
-
-          支持自定义服务器、多条端口映射、密码或私钥认证、配置导入导出及托盘运行。
-
-          下载 PortBridge-win-x64.zip，解压后运行 PortBridge.exe，无需另行安装 .NET。
-
-          适用于 Windows x64。当前同时连接一组服务器，暂不支持自动重连和开机自启。
-          '@
+          $assetName = "PortBridge-$version-Setup-x64.exe"
+          $changelogPath = Join-Path (Get-Location) 'CHANGELOG.md'
+          if (!(Test-Path -LiteralPath $changelogPath)) { throw 'CHANGELOG.md was not found.' }
+          $changelog = [IO.File]::ReadAllText($changelogPath)
+          $headingPattern = "(?m)^## \[$([regex]::Escape($version))\] - [0-9]{4}-[0-9]{2}-[0-9]{2}\r?$"
+          $heading = [regex]::Match($changelog, $headingPattern)
+          if (!$heading.Success) { throw "CHANGELOG.md has no dated section for version $version." }
+          $remainingNotes = $changelog.Substring($heading.Index + $heading.Length)
+          $nextHeading = [regex]::Match($remainingNotes, '(?m)^## ')
+          $notes = if ($nextHeading.Success) { $remainingNotes.Substring(0, $nextHeading.Index) } else { $remainingNotes }
+          $notes = $notes.Trim()
+          if ([string]::IsNullOrWhiteSpace($notes)) { throw "CHANGELOG.md section for $version is empty." }
           $notesPath = Join-Path $env:RUNNER_TEMP 'release-notes.md'
-          Set-Content -LiteralPath $notesPath -Value $notes -Encoding utf8
-          gh release create $tag dist/PortBridge-win-x64.zip --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "PortBridge $tag" --notes-file $notesPath
+          [IO.File]::WriteAllText($notesPath, $notes + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
+          $assetPath = Join-Path (Get-Location) (Join-Path 'dist' $assetName)
+          if (!(Test-Path -LiteralPath $assetPath)) { throw "Release package not found: $assetPath" }
+          gh release create $tag $assetPath --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "PortBridge $tag" --notes-file $notesPath
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed. Existing releases are not overwritten.' }

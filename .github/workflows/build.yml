@@ -13,12 +13,27 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
+      - name: Install Inno Setup 7.1.1
+        shell: pwsh
+        run: |
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-7.1.1-x64.exe'
+          curl.exe --fail --location --http1.1 --retry 5 --retry-all-errors --retry-delay 1 --retry-max-time 300 --output $installer 'https://github.com/jrsoftware/issrc/releases/download/is-7_1_1/innosetup-7.1.1-x64.exe'
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup download failed.' }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike '*Pyrsys B.V.*') { throw 'Inno Setup Authenticode signature is invalid.' }
+          $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash
+          if ($hash -ne '8A5A6711C3766A6E5FB74F280BA0E3551E719CE94538D901FDBD1F8F9920B3F0') { throw 'Inno Setup SHA-256 does not match the pinned release asset.' }
+          $installDir = Join-Path $env:RUNNER_TEMP 'Inno Setup 7.1.1'
+          $install = Start-Process -FilePath $installer -ArgumentList @('/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/NOICONS','/PORTABLE=1',('/DIR="' + $installDir + '"')) -WindowStyle Hidden -Wait -PassThru
+          if ($install.ExitCode -ne 0 -or !(Test-Path -LiteralPath (Join-Path $installDir 'ISCC.exe'))) { throw 'Inno Setup compiler installation failed.' }
+          "ISCC_PATH=$(Join-Path $installDir 'ISCC.exe')" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Validate
         run: dotnet run --project tests/PortBridge.Tests -c Release
       - name: Package
         shell: pwsh
-        run: ./build.ps1
+        run: ./build.ps1 -IsccPath $env:ISCC_PATH
       - uses: actions/upload-artifact@v4
         with:
-          name: PortBridge-win-x64
-          path: dist/PortBridge-win-x64.zip
+          name: PortBridge-Setup-x64
+          path: dist/PortBridge-*-Setup-x64.exe
+          if-no-files-found: error

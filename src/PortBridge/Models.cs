@@ -23,6 +23,24 @@ public sealed class PortRule
             throw new InvalidOperationException("网页路径必须以单个 / 开头，不能包含反斜杠或控制字符。");
         return $"{Protocol}://127.0.0.1:{LocalPort}{path}";
     }
+
+    public string LocalEndpoint() => Protocol is "http" or "https"
+        ? BrowserUrl()
+        : $"127.0.0.1:{LocalPort}";
+
+    public void Validate()
+    {
+        if (string.IsNullOrWhiteSpace(Name)) throw new InvalidOperationException("请填写服务名称。");
+        CheckPort(LocalPort); CheckPort(TargetPort);
+        if (string.IsNullOrWhiteSpace(TargetHost)) throw new InvalidOperationException("请填写远端主机。");
+        if (Protocol is not ("http" or "https" or "tcp")) throw new InvalidOperationException("协议请选择 HTTP、HTTPS 或 TCP。");
+        if (Protocol != "tcp") _ = BrowserUrl();
+    }
+
+    private static void CheckPort(int port)
+    {
+        if (port is < 1 or > 65535) throw new InvalidOperationException("端口范围为 1–65535。");
+    }
 }
 
 public sealed class ServerProfile
@@ -37,24 +55,23 @@ public sealed class ServerProfile
     public BindingList<PortRule> Rules { get; set; } = new();
     public override string ToString() => Name;
 
-    public void Validate()
+    public void ValidateConnection()
     {
         if (string.IsNullOrWhiteSpace(Name) || string.IsNullOrWhiteSpace(Host) || string.IsNullOrWhiteSpace(User))
             throw new InvalidOperationException("请填写配置名称、SSH 主机和用户名。");
         CheckPort(Port);
         if (Auth is not ("password" or "key")) throw new InvalidOperationException("未知的认证方式。");
         if (Auth == "key" && !File.Exists(KeyPath)) throw new InvalidOperationException("请选择存在的私钥文件。");
+    }
+
+    public void Validate()
+    {
+        ValidateConnection();
         var enabled = Rules.Where(r => r.Enabled).ToList();
         if (enabled.Count == 0) throw new InvalidOperationException("请至少启用一条转发规则。");
         if (enabled.Select(r => r.LocalPort).Distinct().Count() != enabled.Count)
             throw new InvalidOperationException("已启用规则的本地端口不能重复。");
-        foreach (var r in enabled)
-        {
-            CheckPort(r.LocalPort); CheckPort(r.TargetPort);
-            if (string.IsNullOrWhiteSpace(r.TargetHost)) throw new InvalidOperationException("请填写目标主机。");
-            if (r.Protocol is not ("http" or "https" or "tcp")) throw new InvalidOperationException("协议请选择 http、https 或 tcp。");
-            if (r.Protocol != "tcp") _ = r.BrowserUrl();
-        }
+        foreach (var r in enabled) r.Validate();
     }
 
     private static void CheckPort(int port)
@@ -68,6 +85,8 @@ public sealed class AppConfig
     public List<ServerProfile> Profiles { get; set; } = new();
     public string SelectedId { get; set; } = "";
     public Dictionary<string, string> TrustedHosts { get; set; } = new();
+    public bool StartWithWindows { get; set; }
+    public bool CheckUpdatesOnStartup { get; set; } = true;
 }
 
 public sealed class ConfigStore

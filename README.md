@@ -1,97 +1,73 @@
 # PortBridge
 
-一个轻量的 Windows SSH 本地端口转发器。在自己电脑的浏览器或客户端里打开远端内网服务，无需一直开着远程桌面和终端。
+PortBridge 是 Windows x64 SSH 本地端口转发器，可在本机浏览器或客户端访问 SSH 服务器所在网络中的服务。适合 Web 管理页、开发服务、数据库和 VNC 等 TCP 服务；不需要安装 OpenSSH，也不会读取 Windows SSH config。
 
-适合 WebUI、管理后台、开发服务器、数据库和 VNC 等 TCP 服务。基于 C#、Windows Forms 和 SSH.NET。无需安装 OpenSSH，不读取系统 SSH config。
+[下载最新版 Windows x64 Setup 安装包](https://github.com/Nortea575/PortBridge/releases/latest) · [更新日志](CHANGELOG.md)
 
-![PortBridge 界面](docs/screenshot.png)
+![PortBridge 工作区界面](docs/screenshot.png)
 
-## 功能
+## 主要功能
 
-- 深色配置侧栏、卡片式连接设置、圆角按钮和连接状态提示。
-- 保存多组服务器配置，每组可配置多条端口映射；当前版本同时连接一组服务器。
-- 密码或私钥文件认证，支持带口令的私钥。
-- 自定义本地端口、目标地址、目标端口和网页路径；支持 HTTP / HTTPS 网页快捷打开及普通 TCP 转发。
-- 首次连接核对 SSH 服务器指纹；后续指纹变化时拒绝连接。
-- 关闭主窗口后保留在托盘，连接继续运行；托盘菜单可打开、断开或退出。
-- 配置导入导出。密码与私钥口令仅用于本次连接，不写入配置文件。
-- 一条规则启动失败时回收本次已建立的全部转发，避免留下半连接状态。
+- 左侧服务器列表管理连接目标；服务器和端口映射分别在独立编辑页保存或取消，工作区用于选择服务器、连接和访问服务。
+- 保存多组服务器和多条映射；同一时间连接一组服务器。
+- 支持 SSH 密码和私钥文件认证。密码及私钥口令在连接时输入，不保存在配置文件中。
+- HTTP(S) 服务行可打开或复制入口；TCP 服务行可复制本机地址。
+- 首次连接核对 SSH 服务器指纹；指纹变化时拒绝连接。
+- 关闭主窗口后程序留在系统托盘，连接继续运行；可从托盘打开、断开或退出。
+- 支持服务器配置导入和导出。
+- 可选登录 Windows 后启动到托盘，不会自动连接 SSH。
+- 可在启动时或手动检查 GitHub 最新稳定版；发现更新后可打开对应 Windows x64 Setup 下载链接，不会自动下载或安装。
 
-## 使用
+## 快速开始
 
-1. 解压 Windows x64 发布包，运行 `PortBridge.exe`。自包含版本无需另装 .NET。
-2. 填写配置名称、SSH 服务器地址、端口和用户名。这里填写实际主机名或 IP，不是本机 SSH config 的别名。
-3. 选择密码认证，或选择私钥文件。密码 / 私钥口令只在当前连接时使用。
-4. 添加转发规则。目标主机从 **SSH 服务器侧**访问；远端服务仅监听环回地址时，通常填写 `127.0.0.1`。
-5. 点击“连接”，首次连接核对并确认服务器指纹。
-6. 选中 HTTP / HTTPS 规则后点击“打开选中服务”；TCP 服务用相应客户端连接 `127.0.0.1:本地端口`。
+1. v0.3.0 通过 Setup 安装，不提供便携 ZIP。下载并运行 `PortBridge-0.3.0-Setup-x64.exe`，按向导安装。默认仅为当前用户安装到 `%LOCALAPPDATA%\Programs\PortBridge`，无需管理员权限；开始菜单入口默认创建，桌面快捷方式和登录启动可选，首次安装时登录启动默认关闭。安装完成页可选择立即启动。
+2. 在左侧服务器列表选择“添加服务器”，填写名称、SSH 主机或 IP、端口、用户名和认证方式。私钥认证还需选择私钥文件。保存后，密码在连接时输入；服务器地址应为实际主机名或 IP，不是 SSH config 别名。
+3. 选择“添加映射”，在独立编辑页填写名称、本地端口、目标主机、目标端口和网页路径，然后保存。服务器与映射编辑页都可以保存或取消。目标主机由 **SSH 服务器侧**访问；远端服务只监听环回地址时，通常填写 `127.0.0.1`。
+4. 回到工作区，选择已保存的服务器，输入本次连接的密码或私钥口令，然后点击“连接服务器”。首次连接时核对并确认服务器指纹。
+5. 连接成功后，HTTP(S) 服务行可“打开”或“复制”入口；TCP 服务行可“复制地址”，再用对应客户端连接，例如 `127.0.0.1:15900`。
 
-通用示例：
+例如，映射本地端口 `18080` 到 SSH 服务器可访问的 `127.0.0.1:8080` 后，可在本机浏览器打开 `http://127.0.0.1:18080/`。原生 VNC 是 TCP 服务，需使用 VNC 客户端；浏览器访问需要远端提供 noVNC 等 Web 服务。
 
-| 服务名称 | 本地端口 | 目标主机 | 目标端口 | 打开方式 | 网页路径 |
-| --- | --- | --- | --- | --- | --- |
-| 管理页面 | 18080 | 127.0.0.1 | 8080 | http | / |
-| 开发服务 | 13000 | 127.0.0.1 | 3000 | http | /admin |
-| VNC | 15900 | 127.0.0.1 | 5900 | tcp | / |
+### 从 v0.2.0 升级
 
-例如第一条映射建立后，本机浏览器打开 `http://127.0.0.1:18080/`。原生 VNC 不是 HTTP 页面，不能直接用浏览器打开；若远端已有 noVNC，转发其网页和 WebSocket 所需端口。noVNC 如需明确指定连接参数，可以在网页路径中填写 `/vnc.html?host=127.0.0.1&port=本地端口&path=websockify&autoconnect=1`。
+先从旧版系统托盘菜单选择“退出”，再运行新的 Setup 安装包。v0.3.0 继续使用 `%LOCALAPPDATA%\PortBridge\settings.json`，无需导入旧配置。卸载程序会移除应用文件和快捷方式，但保留该配置目录；之后重新安装仍可继续使用。
 
-点击窗口右上角 × 会隐藏到托盘，**不会断开连接**。点击“断开”停止转发，点击“退出”关闭软件并停止全部转发。电脑重启后需重新打开软件并连接。当前版本不自动重连、不注册开机启动。
+## 使用说明
 
-## 配置与认证
+### 登录启动与更新
 
-本地设置保存于 `%LOCALAPPDATA%\PortBridge\settings.json`，包含服务器地址、用户名、私钥路径、映射规则和已确认的服务器指纹。密码、私钥口令及私钥内容不保存在其中。日志只显示在当前窗口，不写入日志文件。
+左侧“应用设置”可开启或关闭登录 Windows 时启动，也可设置启动时检查更新或手动检查。登录启动会让程序进入托盘，不会自动连接 SSH。检查更新会查询 GitHub 上的最新稳定版；发现更新后可打开对应版本的 Windows x64 Setup 下载链接（若没有安装包资产，则打开 Release 页面），由用户自行下载和运行安装包。程序不会静默下载或安装更新。网络错误或 GitHub 请求受限时，可稍后重试。
 
-“导出”只导出选中的服务器配置，不包含私钥路径、密码、私钥内容或指纹信任记录。**地址、用户名、规则名称和网页路径会导出**，分享前请自行检查；不要在网页路径中填写访问令牌。导入不会自动连接，私钥认证需要在接收电脑上重新选择私钥文件。
+### 配置与认证
 
-首次使用时核对服务器指纹，不复用 OpenSSH 的 `known_hosts`。如果服务器重装导致指纹变化，先通过可信渠道确认新指纹，再退出程序，编辑本地 `settings.json`，移除 `TrustedHosts` 中对应的 `主机:端口` 记录，然后重新连接核对。
+服务器和映射设置保存在 `%LOCALAPPDATA%\PortBridge\settings.json`，包括主机、用户名、私钥路径、规则和已确认的服务器指纹。私钥文件内容、密码和私钥口令不保存在配置中。导出的配置不包含私钥路径、认证秘密或指纹信任记录；其中会包含服务器地址、用户名、规则名称及网页路径，分享前请检查。导入后需要在本机重新选择私钥文件。
 
-只支持 SSH 密码和私钥文件认证；当前版本不支持 SSH agent、跳板机、SSH config 导入、键盘交互式 MFA、UDP、SOCKS 或远程端口转发。本地监听固定为 `127.0.0.1`，仅供本机访问。SSH 服务器需要允许 TCP 转发。
+日志仅显示在当前窗口，不写入日志文件。首次使用时需核对服务器指纹，不复用 OpenSSH 的 `known_hosts`。若服务器重装导致指纹改变，先通过可信渠道核验新指纹；当前版本会拒绝连接，需退出程序并从 `settings.json` 的 `TrustedHosts` 中移除对应 `主机:端口` 记录，再重新连接确认。
 
-## 构建
+### 限制
 
-环境：Windows、.NET 9 SDK。首次构建需要访问 NuGet 下载依赖。
+- 同时连接一组服务器；当前不支持自动重连。
+- 仅支持 SSH 密码和私钥文件认证；不支持 SSH agent、跳板机、SSH config 导入、键盘交互式 MFA、UDP、SOCKS 或远程端口转发。
+- 本地服务只监听 `127.0.0.1`，仅供本机访问；SSH 服务器需允许 TCP 转发。
+- 安装包尚未进行代码签名，Windows 可能显示安全提示。
+
+## 构建与验证
+
+构建环境为 Windows、.NET 9 SDK 和 Inno Setup 7.1.1 x64；首次构建需要通过 NuGet 下载依赖。
 
 ```powershell
 # 运行源码
 dotnet run --project src/PortBridge
 
-# 发布 Windows x64 自包含单文件程序及 ZIP
+# 构建 Windows x64 Setup 安装包
 ./build.ps1
 
-# ARM64（需要在对应架构上另行验证）
-./build.ps1 -Runtime win-arm64
-```
-
-构建输出位于 `dist/win-x64/PortBridge.exe` 和 `dist/PortBridge-win-x64.zip`。自包含程序包含运行时，体积会大于仅发布业务代码的版本。发布程序未做代码签名。
-
-## 验证
-
-```powershell
-# 配置、端口校验、URL 与持久化检查
+# 运行自动化验证
 dotnet run --project tests/PortBridge.Tests -c Release
-
-# 额外生成实际 WinForms 界面截图（需要交互式 Windows 桌面）
-dotnet run --project tests/PortBridge.Tests -c Release -- --render
 ```
 
-实机集成检查从环境变量读取测试服务器，测试拒绝未信任指纹、私钥登录、多端口 HTTP 转发、断开释放端口以及端口冲突回滚。应对自己有权访问的测试服务器运行；`PORTBRIDGE_TEST_PORTS` 至少需要两个可正常响应的 HTTP 服务端口。
-
-```powershell
-$env:PORTBRIDGE_TEST_HOST = 'your-test-host'
-$env:PORTBRIDGE_TEST_USER = 'your-test-user'
-$env:PORTBRIDGE_TEST_KEY = 'C:\path\to\private-key'
-$env:PORTBRIDGE_TEST_FINGERPRINT = 'SHA256:your-verified-fingerprint'
-$env:PORTBRIDGE_TEST_PORTS = '8080,3000'
-dotnet run --project tests/PortBridge.Tests -c Release -- --integration
-```
-
-## GitHub 发布
-
-仓库应包含 `src/`、`tests/`、`examples/`、`docs/`、`licenses/`、`.github/`、`build.ps1`、README、许可证和第三方声明。`bin/`、`obj/`、`dist/` 及本地设置已由 `.gitignore` 排除。上传发布包时使用 GitHub Releases，源码通过正常 Git 提交上传即可。
-
-仓库内仅附通用示例，不包含真实服务器配置或任何密钥。提供 GitHub Actions 构建检查和发布工作流。向 main 提交 release-version.txt 的版本变更，会先运行检查、构建 Windows 包，再创建对应版本的 GitHub Release；也可在 Actions 中手动运行 Publish release。release-version.txt 必须与项目版本一致，已有 Release 不会被覆盖。
+构建产物为 `dist/PortBridge-0.3.0-Setup-x64.exe`。安装包包含自包含应用程序和运行所需许可证，不包含示例服务器配置、测试或开发资料。安装后无需另行安装 .NET。
 
 ## 许可
 
-MIT，见 [LICENSE](LICENSE)。依赖及分发许可证见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+本项目采用 MIT 许可，见 [LICENSE](LICENSE)。依赖及分发许可证见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
